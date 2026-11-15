@@ -6,21 +6,21 @@
 <title>Latam Scope Intelligence · Radar de inversiones de la Región Andina</title>
 <meta name="description" content="Radar de inversiones, M&A, expansiones y estrategias empresariales en Perú, Colombia, Chile y Ecuador, actualizado cada semana.">
 <meta name="theme-color" content="#0E1A26">
-<link rel="canonical" href="https://lsi-radar.github.io/radar-inversiones/">
+<link rel="canonical" href="https://lsi-radar.github.io/inversiones-demo/">
 <meta property="og:type" content="website">
 <meta property="og:site_name" content="Latam Scope Intelligence">
 <meta property="og:locale" content="es_PE">
-<meta property="og:url" content="https://lsi-radar.github.io/radar-inversiones/">
+<meta property="og:url" content="https://lsi-radar.github.io/inversiones-demo/">
 <meta property="og:title" content="Las inversiones de la Región Andina, en un solo lugar">
 <meta property="og:description" content="Radar semanal de inversiones, M&A, expansiones y financiamiento de empresas en Perú, Colombia, Chile y Ecuador. Solicita una demo para tu empresa o universidad.">
-<meta property="og:image" content="https://lsi-radar.github.io/radar-inversiones/marca/lsi-compartir.png">
+<meta property="og:image" content="https://lsi-radar.github.io/inversiones-demo/marca/lsi-compartir.png">
 <meta property="og:image:width" content="1200">
 <meta property="og:image:height" content="630">
 <meta property="og:image:alt" content="Latam Scope Intelligence · Las inversiones de la Región Andina, en un solo lugar">
 <meta name="twitter:card" content="summary_large_image">
 <meta name="twitter:title" content="Las inversiones de la Región Andina, en un solo lugar">
 <meta name="twitter:description" content="Radar semanal de inversiones, M&A, expansiones y financiamiento en Perú, Colombia, Chile y Ecuador.">
-<meta name="twitter:image" content="https://lsi-radar.github.io/radar-inversiones/marca/lsi-compartir.png">
+<meta name="twitter:image" content="https://lsi-radar.github.io/inversiones-demo/marca/lsi-compartir.png">
 <link rel="icon" type="image/png" sizes="32x32" href="marca/favicon-32.png">
 <link rel="apple-touch-icon" sizes="180x180" href="marca/apple-touch-icon.png">
 <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 48 48'%3E%3Crect width='48' height='48' rx='11' fill='%230E1A26'/%3E%3Cpath d='M6 33 L12 27 L17 30.5 L24 19 L29.5 27.5 L33.5 24.5 L42 32' fill='none' stroke='%2349AE9B' stroke-width='2.4' stroke-linejoin='round'/%3E%3Ccircle cx='24' cy='24' r='18.6' fill='none' stroke='%23D8AD52' stroke-width='2.6'/%3E%3Ccircle cx='24' cy='19' r='3' fill='%23D8AD52'/%3E%3C/svg%3E">
@@ -483,6 +483,7 @@ html:not(.locked) #acceso,html:not(.locked) .tb-tag{display:none !important;}
 .resuming #lgForm{display:none;}
 .spin{width:22px;height:22px;border-radius:50%;border:2.5px solid rgba(20,33,44,0.15);border-top-color:#B8872A;animation:spin .8s linear infinite;}
 @keyframes spin{to{transform:rotate(360deg);}}
+.gate-card.lg-flash{box-shadow:0 0 0 3px #D8AD52,0 30px 80px rgba(0,0,0,0.45);transition:box-shadow .3s;}
 @media (prefers-reduced-motion:no-preference){.gate h1{animation:heroIn .9s cubic-bezier(.2,.7,.2,1) both;}.gate-card{animation:heroIn .9s cubic-bezier(.2,.7,.2,1) .2s both;}}
 @media(max-width:560px){.gate-card{padding:24px 20px 22px;border-radius:16px;}}
 /* Celular y tablet: título → ingreso → resto, para no obligar a bajar hasta el formulario */
@@ -1316,6 +1317,44 @@ function done(d, porCorreo){
     : 'Recibimos tu solicitud para ' + esc(d.organizacion) + '. Te escribiremos a ' + esc(d.email) + ' para coordinar la demo.';
   box.classList.add('sent'); form.reset(); syncTipo(); $('dmDone').focus({preventScroll:true});
 }
+function enviar(d){
+  if(!LSI_DEMO.web3formsKey) return Promise.reject(new Error('sin-clave'));
+  var payload = Object.assign({
+    access_key: LSI_DEMO.web3formsKey,
+    subject: 'Solicitud de demo LSI · ' + d.tipo + ' · ' + d.organizacion + (/Marcela/.test(d.origen) ? ' · vía Marcela' : ''),
+    from_name: 'Radar LSI · Solicitar una demo',
+    botcheck: false
+  }, d);
+  return fetch('https://api.web3forms.com/submit', {method:'POST', headers:{'Content-Type':'application/json', 'Accept':'application/json'}, body: JSON.stringify(payload)})
+    .then(function(r){ return r.json().catch(function(){ return {success:false}; }); })
+    .then(function(j){ if(!(j && j.success)) throw new Error(j && j.message || 'error'); return j; });
+}
+/* Para Marcela: registrar una solicitud dictada por voz y abrir el formulario ya llenado */
+window.lsiRegistrarSolicitud = function(p){
+  p = p || {};
+  var tipos = {Empresa:1, Universidad:1, Otra:1};
+  var d = {
+    tipo: tipos[p.tipo] ? p.tipo : 'Otra', nombre: String(p.nombre||'').trim(), cargo: String(p.cargo||'').trim(),
+    organizacion: String(p.organizacion||'').trim(), pais: String(p.pais||'').trim(), email: String(p.correo||'').trim().toLowerCase().replace(/\s+/g,''),
+    telefono: String(p.telefono||'').trim(), usuarios: '', mensaje: String(p.interes||'').trim(),
+    consentimiento: 'Sí, verbal con Marcela (agente de voz), ' + new Date().toLocaleString('es-PE', {timeZone:'America/Lima'}) + ' (hora de Lima)',
+    origen: 'Marcela (agente de voz)', pagina: location.href.split('#')[0]
+  };
+  if(p.consentimiento !== true && p.consentimiento !== 'true') return Promise.resolve('error: el visitante no autorizó el uso de sus datos; no se registró nada.');
+  var falta = [['nombre', d.nombre], ['organización', d.organizacion], ['país', d.pais], ['correo', d.email]].filter(function(x){ return !x[1]; }).map(function(x){ return x[0]; });
+  if(falta.length) return Promise.resolve('error: faltan datos: ' + falta.join(', ') + '.');
+  if(!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(d.email)) return Promise.resolve('error: el correo "' + d.email + '" no parece válido; confírmalo con el visitante.');
+  return enviar(d).then(function(){ return 'ok: solicitud registrada para ' + d.organizacion + '. El equipo de LSI escribirá a ' + d.email + '.'; },
+                       function(){ return 'error: no se pudo enviar por un problema de conexión. Ofrece mostrar el formulario.'; });
+};
+window.lsiFormularioDemo = function(p){
+  p = p || {};
+  var map = {Empresa:'empresa', Universidad:'universidad', Otra:'otra'};
+  open(map[p.tipo] || null, 'Marcela (formulario)');
+  if(p.nombre) $('dmNombre').value = p.nombre;
+  if(p.organizacion) $('dmOrg').value = p.organizacion;
+  if(p.correo) $('dmCorreo').value = String(p.correo).trim().toLowerCase();
+};
 form.addEventListener('submit', function(e){
   e.preventDefault(); msg('');
   if($('dmHp').checked) return;            // trampa para robots
@@ -1327,15 +1366,8 @@ form.addEventListener('submit', function(e){
     return;
   }
   var btn = $('dmSend'); btn.disabled = true; btn.textContent = 'Enviando…';
-  var payload = Object.assign({
-    access_key: LSI_DEMO.web3formsKey,
-    subject: 'Solicitud de demo LSI · ' + d.tipo + ' · ' + d.organizacion,
-    from_name: 'Radar LSI · Solicitar una demo',
-    botcheck: false
-  }, d);
-  fetch('https://api.web3forms.com/submit', {method:'POST', headers:{'Content-Type':'application/json', 'Accept':'application/json'}, body: JSON.stringify(payload)})
-    .then(function(r){ return r.json().catch(function(){ return {success:false}; }); })
-    .then(function(j){ if(j && j.success) done(d); else throw new Error(j && j.message || 'error'); })
+  enviar(d)
+    .then(function(){ done(d); })
     .catch(function(){
       msg('No pudimos enviar tu solicitud. Revisa tu conexión e inténtalo de nuevo' + (mt ? ', o <a href="'+mt+'">envíanosla por correo</a>.' : '.'));
     })
@@ -1430,6 +1462,46 @@ $('tbOut').addEventListener('click', function(){
   clear();
   location.replace(location.pathname + location.search);
 });
+})();
+</script>
+<script>
+/* ══ Marcela, agente de voz (ElevenLabs) ═════════════════════════════
+   Solo aparece en la pantalla de ingreso. Al ingresar al Radar se retira.
+   El agente solo acepta conversaciones desde lsi-radar.github.io.            */
+window.LSI_MARCELA = { agentId: 'agent_4901m7eeaw84eyvbtjj7j11f1332', activa: true };
+(function(){
+'use strict';
+var root = document.documentElement, el = null;
+function cargar(){
+  if(!LSI_MARCELA.activa || el || !root.classList.contains('locked') || root.classList.contains('resuming')) return;
+  el = document.createElement('elevenlabs-convai');
+  el.setAttribute('agent-id', LSI_MARCELA.agentId);
+  el.addEventListener('elevenlabs-convai:call', function(ev){
+    ev.detail.config.clientTools = {
+      registrar_solicitud_demo: function(p){ return window.lsiRegistrarSolicitud ? window.lsiRegistrarSolicitud(p) : 'error: formulario no disponible'; },
+      mostrar_formulario_demo: function(p){ if(window.lsiFormularioDemo) window.lsiFormularioDemo(p); },
+      preparar_ingreso: function(p){
+        var u = document.getElementById('lgUser'), pw = document.getElementById('lgPass');
+        if(!u) return;
+        u.value = String((p && p.usuario) || 'demo');
+        var card = document.querySelector('.gate-card'); if(card){ card.classList.add('lg-flash'); setTimeout(function(){ card.classList.remove('lg-flash'); }, 2400); }
+        var touch = window.matchMedia && matchMedia('(pointer:coarse)').matches;
+        if(!touch){ card && card.scrollIntoView({block:'center', behavior:'smooth'}); pw.focus({preventScroll:true}); }
+      }
+    };
+  });
+  document.body.appendChild(el);
+  if(!document.getElementById('el-convai-js')){
+    var sc = document.createElement('script'); sc.id = 'el-convai-js'; sc.async = true; sc.type = 'text/javascript';
+    sc.src = 'https://unpkg.com/@elevenlabs/convai-widget-embed';
+    document.body.appendChild(sc);
+  }
+}
+function retirar(){ if(el){ el.remove(); el = null; } }
+// Se carga cuando se confirma que no hay sesión guardada; se retira al ingresar
+new MutationObserver(function(){ if(root.classList.contains('locked')) cargar(); else retirar(); })
+  .observe(root, {attributes:true, attributeFilter:['class']});
+cargar();
 })();
 </script>
 </body>
