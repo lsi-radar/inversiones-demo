@@ -483,6 +483,28 @@ html:not(.locked) #acceso,html:not(.locked) .tb-tag{display:none !important;}
 .resuming #lgForm{display:none;}
 .spin{width:22px;height:22px;border-radius:50%;border:2.5px solid rgba(20,33,44,0.15);border-top-color:#B8872A;animation:spin .8s linear infinite;}
 @keyframes spin{to{transform:rotate(360deg);}}
+/* Marcela en la pantalla de ingreso */
+.mc-cta{display:grid;grid-template-columns:auto minmax(0,1fr);gap:6px 18px;align-items:center;margin:0 0 22px;padding:16px 18px;border-radius:16px;background:linear-gradient(135deg,rgba(216,173,82,0.16),rgba(73,174,155,0.10));border:1px solid rgba(216,173,82,0.45);max-width:640px;}
+.mc-av{grid-row:1/3;position:relative;width:76px;height:76px;border-radius:50%;padding:3px;background:linear-gradient(135deg,#D8AD52,#49AE9B);animation:mcRing 2.8s ease-in-out infinite;}
+.mc-av img{width:100%;height:100%;border-radius:50%;object-fit:cover;object-position:50% 30%;display:block;background:#16283C;}
+.mc-ini{display:none;width:100%;height:100%;border-radius:50%;background:#16283C;color:var(--gold);font-family:var(--serif);font-size:32px;font-weight:600;align-items:center;justify-content:center;}
+.mc-av.noimg .mc-ini{display:flex;}
+.mc-on{position:absolute;right:3px;bottom:5px;width:15px;height:15px;border-radius:50%;background:#3DD68C;border:3px solid #0E1A26;}
+@keyframes mcRing{0%,100%{box-shadow:0 0 0 0 rgba(216,173,82,0.45);}50%{box-shadow:0 0 0 10px rgba(216,173,82,0);}}
+.mc-t b{display:block;font-family:var(--serif);font-size:19px;font-weight:600;line-height:1.25;color:var(--off);}
+.mc-t span{display:block;font-size:13.5px;color:var(--muted);line-height:1.5;margin-top:3px;}
+.mc-b{display:flex;gap:10px;flex-wrap:wrap;align-items:center;}
+.mc-voice{display:inline-flex;align-items:center;gap:8px;padding:11px 18px;border:none;border-radius:999px;background:var(--gold);color:var(--ink);font:inherit;font-size:14.5px;font-weight:700;cursor:pointer;transition:background .15s,transform .15s;}
+.mc-voice:hover{background:#E6BD66;transform:translateY(-1px);}
+.mc-text{display:inline-flex;align-items:center;gap:7px;padding:10px 14px;border:1px solid var(--line-strong);border-radius:999px;background:transparent;color:var(--off);font:inherit;font-size:13.5px;cursor:pointer;}
+.mc-text:hover{border-color:var(--gold);color:var(--gold);}
+.mc-voice svg,.mc-text svg{width:17px;height:17px;}
+.mc-hint{position:fixed;left:24px;bottom:120px;z-index:2000;max-width:300px;padding:12px 14px;border-radius:12px;background:var(--paper);color:var(--ink);font-size:13.5px;line-height:1.45;box-shadow:0 18px 40px rgba(0,0,0,.45);animation:heroIn .3s ease both;}
+elevenlabs-convai.mc-pulse{filter:drop-shadow(0 0 14px rgba(216,173,82,.9));}
+html:not(.locked) .mc-cta,.mc-off .mc-cta{display:none !important;}
+@media (prefers-reduced-motion:reduce){.mc-av{animation:none;}}
+@media(max-width:1000px){.mc-cta{order:2;margin:0;}}
+@media(max-width:560px){.mc-cta{grid-template-columns:auto minmax(0,1fr);padding:14px;}.mc-av{width:60px;height:60px;}.mc-t b{font-size:17px;}.mc-b{grid-column:1/-1;}}
 .gate-card.lg-flash{box-shadow:0 0 0 3px #D8AD52,0 30px 80px rgba(0,0,0,0.45);transition:box-shadow .3s;}
 @media (prefers-reduced-motion:no-preference){.gate h1{animation:heroIn .9s cubic-bezier(.2,.7,.2,1) both;}.gate-card{animation:heroIn .9s cubic-bezier(.2,.7,.2,1) .2s both;}}
 @media(max-width:560px){.gate-card{padding:24px 20px 22px;border-radius:16px;}}
@@ -542,6 +564,11 @@ html:not(.locked) #acceso,html:not(.locked) .tb-tag{display:none !important;}
       <h1 id="gateTitle">Las inversiones de la Región Andina, en un solo lugar</h1>
       <p class="hero-lede">Cada semana registramos los anuncios de inversión, M&amp;A, expansión y financiamiento de empresas en <strong>Perú, Colombia, Chile y Ecuador</strong>, organizados empresa por empresa para que encuentres oportunidades de negocio antes que tu competencia.</p>
       <div class="gate-kpis" id="gateKpis"></div>
+      <div class="mc-cta" id="mcCta">
+        <div class="mc-av"><img src="marca/marcela-256.jpg" alt="Marcela, asesora virtual de LSI" width="76" height="76" onerror="this.parentNode.classList.add('noimg');this.remove()"><span class="mc-ini" aria-hidden="true">M</span><i class="mc-on" title="En línea"></i></div>
+        <div class="mc-t"><b>¿Primera vez en el Radar? Conversa con Marcela</b><span>Nuestra asesora virtual te explica el Radar en minutos y te deja listo un acceso de demostración.</span></div>
+        <div class="mc-b"><button type="button" class="mc-voice" data-marcela="voz"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>Hablar con Marcela</button><button type="button" class="mc-text" data-marcela="texto"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.4A8 8 0 1 1 21 12z"/></svg>o escríbele</button></div>
+      </div>
       <div class="gate-flags"><span><i class="flag"><svg viewBox="0 0 3 2"><rect width="3" height="2" fill="#fff"/><rect width="1" height="2" fill="#D91023"/><rect x="2" width="1" height="2" fill="#D91023"/></svg></i>Perú</span><span><i class="flag"><svg viewBox="0 0 3 2"><rect width="3" height="1" fill="#FCD116"/><rect y="1" width="3" height=".5" fill="#003893"/><rect y="1.5" width="3" height=".5" fill="#CE1126"/></svg></i>Colombia</span><span><i class="flag"><svg viewBox="0 0 3 2"><rect width="3" height="2" fill="#D52B1E"/><rect width="3" height="1" fill="#fff"/><rect width="1" height="1" fill="#0039A6"/><polygon fill="#fff" points="0.500,0.230 0.565,0.411 0.757,0.417 0.605,0.534 0.659,0.718 0.500,0.610 0.341,0.718 0.395,0.534 0.243,0.417 0.435,0.411"/></svg></i>Chile</span><span><i class="flag"><svg viewBox="0 0 3 2"><rect width="3" height="1" fill="#FFD100"/><rect y="1" width="3" height=".5" fill="#034EA2"/><rect y="1.5" width="3" height=".5" fill="#ED1C24"/><circle cx="1.5" cy="1" r=".26" fill="#A47A3D" stroke="#FFD100" stroke-width=".05"/></svg></i>Ecuador</span></div>
     </div>
     <div class="gate-card">
@@ -1498,6 +1525,32 @@ function cargar(){
   }
 }
 function retirar(){ if(el){ el.remove(); el = null; } }
+// Botones "Hablar con Marcela" / "o escríbele": abren el widget; si no se puede, lo señalan
+function buscarBoton(rootNode, textos){
+  var hits = [];
+  (function walk(n){
+    if(!n || hits.length) return;
+    var btns = n.querySelectorAll ? n.querySelectorAll('button,[role=button]') : [];
+    for(var i=0;i<btns.length;i++){
+      var b = btns[i], t = ((b.getAttribute('aria-label')||'') + ' ' + (b.textContent||'')).toLowerCase();
+      for(var j=0;j<textos.length;j++){ if(t.indexOf(textos[j]) >= 0){ hits.push(b); return; } }
+    }
+    var all = n.querySelectorAll ? n.querySelectorAll('*') : [];
+    for(var k=0;k<all.length && !hits.length;k++){ if(all[k].shadowRoot) walk(all[k].shadowRoot); }
+  })(rootNode);
+  return hits[0] || null;
+}
+function abrir(modo){
+  if(!el){ cargar(); }
+  var b = el && el.shadowRoot ? buscarBoton(el.shadowRoot, modo === 'texto' ? ['escribir a marcela','escribir'] : ['hablar con marcela']) : null;
+  if(b){ b.click(); return; }
+  if(el){ el.classList.add('mc-pulse'); setTimeout(function(){ el && el.classList.remove('mc-pulse'); }, 4000); }
+  var h = document.createElement('div'); h.className = 'mc-hint'; h.setAttribute('role','status');
+  h.textContent = 'Marcela te espera abajo a la izquierda: toca “' + (modo === 'texto' ? 'Escribir a Marcela' : 'Hablar con Marcela') + '”.';
+  document.body.appendChild(h); setTimeout(function(){ h.remove(); }, 5000);
+}
+document.addEventListener('click', function(ev){ var t = ev.target.closest('[data-marcela]'); if(t){ ev.preventDefault(); abrir(t.dataset.marcela); } });
+if(!LSI_MARCELA.activa) root.classList.add('mc-off');
 // Se carga cuando se confirma que no hay sesión guardada; se retira al ingresar
 new MutationObserver(function(){ if(root.classList.contains('locked')) cargar(); else retirar(); })
   .observe(root, {attributes:true, attributeFilter:['class']});
