@@ -1502,10 +1502,13 @@ $('lgForm').addEventListener('submit', function(ev){
     var sv = {k: acc.k, n: acc.n}, recordar = $('lgRem').checked;
     if(acc.v){ sv.v = Date.parse(acc.v); if(Date.now() > sv.v) throw new Error('vencido'); }
     if(acc.t === 'demo'){
-      var usado = null; try{ usado = localStorage.getItem(DEMO_KEY); }catch(e){}
-      if(usado) throw new Error('demo-usada');
-      try{ localStorage.setItem(DEMO_KEY, String(Date.now())); }catch(e){}
-      sv.t = 'demo'; sv.exp = Date.now() + (acc.m || 60) * 60000; recordar = false;
+      // Visita de demostración: N minutos desde el PRIMER ingreso en este navegador.
+      // Dentro de ese tiempo puede volver a entrar (otra pestaña, otra ventana); después se bloquea.
+      var ini = 0; try{ ini = parseInt(localStorage.getItem(DEMO_KEY), 10) || 0; }catch(e){}
+      var dur = (acc.m || 60) * 60000;
+      if(ini && Date.now() > ini + dur) throw new Error('demo-usada');
+      if(!ini){ ini = Date.now(); try{ localStorage.setItem(DEMO_KEY, String(ini)); }catch(e){} }
+      sv.t = 'demo'; sv.exp = ini + dur; recordar = false;
     }
     return openData(acc.k).then(function(d){
       save(JSON.stringify(sv), recordar);
@@ -1514,7 +1517,7 @@ $('lgForm').addEventListener('submit', function(ev){
     });
   }).catch(function(e){
     var m = e && e.message;
-    if(m === 'demo-usada') err('Este acceso de demostración ya se usó en este equipo. Tu usuario personal, con 48 horas de uso libre, te llegará por correo en un máximo de 24 horas. ¿Dudas? <a href="#demo" data-demo="" data-origen="demo ya usada">Escríbenos</a>.');
+    if(m === 'demo-usada') err('Tu visita de demostración de 60 minutos en este equipo ya terminó. Tu usuario personal, con 48 horas de uso libre, te llegará por correo en un máximo de 24 horas. ¿Dudas? <a href="#demo" data-demo="" data-origen="demo ya usada">Escríbenos</a>.');
     else if(m === 'vencido') err('Tu acceso de prueba ya venció. Para seguir usando el Radar, <a href="#demo" data-demo="" data-origen="prueba vencida">conversemos sobre los planes</a>.');
     else err('Usuario o contraseña incorrectos. Revisa tus datos o <a href="#demo" data-demo="" data-origen="ingreso fallido">solicita una demo</a>.');
     $('lgPass').select();
@@ -1539,6 +1542,9 @@ function cargar(){
   el = document.createElement('elevenlabs-convai');
   el.setAttribute('agent-id', LSI_MARCELA.agentId);
   el.addEventListener('elevenlabs-convai:call', function(ev){
+    // Límite por modalidad: el agente permite 8 min (texto); la voz se cierra aquí a los 4 min
+    clearTimeout(topeVoz);
+    if(!ev.detail.config.textOnly){ topeVoz = setTimeout(cerrarVoz, VOZ_MAX_SEG * 1000); }
     ev.detail.config.clientTools = {
       registrar_solicitud_demo: function(p){ return window.lsiRegistrarSolicitud ? window.lsiRegistrarSolicitud(p) : 'error: formulario no disponible'; },
       mostrar_formulario_demo: function(p){ if(window.lsiFormularioDemo) window.lsiFormularioDemo(p); },
@@ -1559,7 +1565,18 @@ function cargar(){
     document.body.appendChild(sc);
   }
 }
-function retirar(){ if(el){ el.remove(); el = null; } }
+function retirar(){ clearTimeout(topeVoz); if(el){ el.remove(); el = null; } }
+var VOZ_MAX_SEG = 240, topeVoz = null;
+function avisar(texto, ms){
+  var h = document.createElement('div'); h.className = 'mc-hint'; h.setAttribute('role','status');
+  h.textContent = texto; document.body.appendChild(h); setTimeout(function(){ h.remove(); }, ms || 5000);
+}
+function cerrarVoz(){
+  var b = el && el.shadowRoot ? buscarBoton(el.shadowRoot, ['terminar']) : null;
+  if(!b) return;                       // la llamada ya terminó
+  b.click();
+  avisar('La conversación por voz llega hasta 4 minutos. Si te quedó algo pendiente, puedes seguir escribiéndole a Marcela.', 9000);
+}
 // Botones "Hablar con Marcela" / "o escríbele": abren el widget; si no se puede, lo señalan
 function buscarBoton(rootNode, textos){
   var hits = [];
@@ -1584,9 +1601,7 @@ function abrir(modo, intento){
   intento = intento || 0;
   if(intento < 12){ setTimeout(function(){ abrir(modo, intento + 1); }, 250); return; }   // el widget aún carga
   el.classList.add('mc-pulse'); setTimeout(function(){ el && el.classList.remove('mc-pulse'); }, 4000);
-  var h = document.createElement('div'); h.className = 'mc-hint'; h.setAttribute('role','status');
-  h.textContent = 'Marcela te espera abajo a la izquierda: toca “' + (modo === 'texto' ? 'Escribir a Marcela' : 'Hablar con Marcela') + '”.';
-  document.body.appendChild(h); setTimeout(function(){ h.remove(); }, 5000);
+  avisar('Marcela te espera abajo a la izquierda: toca “' + (modo === 'texto' ? 'Escribir a Marcela' : 'Hablar con Marcela') + '”.');
 }
 document.addEventListener('click', function(ev){ var t = ev.target.closest('[data-marcela]'); if(t){ ev.preventDefault(); abrir(t.dataset.marcela); } });
 if(!LSI_MARCELA.activa) root.classList.add('mc-off');
