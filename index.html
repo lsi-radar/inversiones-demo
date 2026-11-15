@@ -483,6 +483,11 @@ html:not(.locked) #acceso,html:not(.locked) .tb-tag{display:none !important;}
 .resuming #lgForm{display:none;}
 .spin{width:22px;height:22px;border-radius:50%;border:2.5px solid rgba(20,33,44,0.15);border-top-color:#B8872A;animation:spin .8s linear infinite;}
 @keyframes spin{to{transform:rotate(360deg);}}
+elevenlabs-convai:not(.mc-show){visibility:hidden !important;opacity:0 !important;pointer-events:none !important;}
+elevenlabs-convai.mc-show{animation:heroIn .35s ease both;}
+.acc-bar{padding:10px 6vw;background:linear-gradient(90deg,rgba(216,173,82,0.18),rgba(73,174,155,0.12));border-bottom:1px solid rgba(216,173,82,0.35);font-size:13.5px;color:var(--off);line-height:1.5;}
+.acc-bar b{color:var(--gold);}
+.acc-bar a{color:var(--gold);font-weight:600;}
 /* Marcela en la pantalla de ingreso */
 .mc-cta{display:grid;grid-template-columns:auto minmax(0,1fr);gap:6px 18px;align-items:center;margin:0 0 22px;padding:16px 18px;border-radius:16px;background:linear-gradient(135deg,rgba(216,173,82,0.16),rgba(73,174,155,0.10));border:1px solid rgba(216,173,82,0.45);max-width:640px;}
 .mc-av{grid-row:1/3;position:relative;width:76px;height:76px;border-radius:50%;padding:3px;background:linear-gradient(135deg,#D8AD52,#49AE9B);animation:mcRing 2.8s ease-in-out infinite;}
@@ -1443,11 +1448,25 @@ function login(u, pw){
     }).catch(function(){ throw new Error('credenciales'); });
   }).then(function(buf){ return JSON.parse(td.decode(buf)); });
 }
-function start(data, nombre){
+var DEMO_KEY = 'lsi_demo_usado_v1', timer = null;
+function hora(ms){ return new Date(ms).toLocaleTimeString('es-PE', {hour:'2-digit', minute:'2-digit', timeZone:'America/Lima'}); }
+function fecha(ms){ return new Date(ms).toLocaleString('es-PE', {day:'numeric', month:'short', hour:'2-digit', minute:'2-digit', timeZone:'America/Lima'}); }
+function vigencia(sv){
+  // Barra informativa y cierre automático al vencer (demo de un solo uso o prueba personal)
+  var fin = sv.exp || sv.v || 0; if(!fin) return;
+  var bar = document.createElement('div'); bar.className = 'acc-bar'; bar.setAttribute('role','status');
+  bar.innerHTML = sv.t === 'demo'
+    ? '<b>Visita de demostración</b> · disponible hasta las ' + hora(fin) + ' · Tu usuario personal, con 48 horas de uso libre, te llegará por correo en un máximo de 24 horas.'
+    : '<b>Acceso de prueba</b> · vigente hasta el ' + fecha(fin) + ' (hora de Lima). <a href="#demo" data-demo="" data-origen="barra de prueba">Conversemos sobre los planes</a>';
+  var main = document.querySelector('main'); main.insertBefore(bar, main.firstChild);
+  timer = setInterval(function(){ if(Date.now() > fin){ clearInterval(timer); clear(); location.replace(location.pathname + '#fin-acceso'); location.reload(); } }, 20000);
+}
+function start(data, nombre, sv){
   window.LSI_DATA = data;
   $('tbUser').textContent = nombre || 'Mi cuenta';
   root.classList.remove('locked', 'resuming');
   window.__lsiStart();
+  if(sv) vigencia(sv);
   var h = location.hash;
   if(h && !/^#(empresa=|demo$)/.test(h)){ var el = document.getElementById(h.slice(1)); if(el) setTimeout(function(){ el.scrollIntoView(); }, 80); }
   else if(!/^#empresa=/.test(h)) window.scrollTo(0, 0);
@@ -1459,9 +1478,14 @@ var saved = store();
 if(saved && C && E){
   try{
     var sv = JSON.parse(saved);
-    openData(sv.k).then(function(d){ start(d, sv.n); }).catch(function(){ clear(); root.classList.remove('resuming'); });
+    if((sv.exp && Date.now() > sv.exp) || (sv.v && Date.now() > sv.v)) throw new Error('vencido');
+    openData(sv.k).then(function(d){ start(d, sv.n, sv); }).catch(function(){ clear(); root.classList.remove('resuming'); });
   }catch(e){ clear(); root.classList.remove('resuming'); }
 } else root.classList.remove('resuming');
+if(location.hash === '#fin-acceso'){
+  err('Tu tiempo de acceso terminó. Si aún no tienes tu usuario personal, te llegará por correo; también puedes <a href="#demo" data-demo="" data-origen="fin de acceso">escribirnos</a>.');
+  try{ history.replaceState(null, '', location.pathname + location.search); }catch(e){}
+}
 
 $('lgShow').addEventListener('click', function(){
   var i = $('lgPass'), on = i.type === 'password'; i.type = on ? 'text' : 'password';
@@ -1475,13 +1499,24 @@ $('lgForm').addEventListener('submit', function(ev){
   if(!C || !E){ err('Tu navegador no permite el ingreso seguro. Usa una versión actualizada de Chrome, Edge, Safari o Firefox.'); return; }
   var b = $('lgBtn'); b.disabled = true; b.textContent = 'Verificando…'; err('');
   login(u, pw).then(function(acc){
+    var sv = {k: acc.k, n: acc.n}, recordar = $('lgRem').checked;
+    if(acc.v){ sv.v = Date.parse(acc.v); if(Date.now() > sv.v) throw new Error('vencido'); }
+    if(acc.t === 'demo'){
+      var usado = null; try{ usado = localStorage.getItem(DEMO_KEY); }catch(e){}
+      if(usado) throw new Error('demo-usada');
+      try{ localStorage.setItem(DEMO_KEY, String(Date.now())); }catch(e){}
+      sv.t = 'demo'; sv.exp = Date.now() + (acc.m || 60) * 60000; recordar = false;
+    }
     return openData(acc.k).then(function(d){
-      save(JSON.stringify({k: acc.k, n: acc.n}), $('lgRem').checked);
+      save(JSON.stringify(sv), recordar);
       $('lgPass').value = '';
-      start(d, acc.n);
+      start(d, acc.n, sv);
     });
-  }).catch(function(){
-    err('Usuario o contraseña incorrectos. Revisa tus datos o <a href="#demo" data-demo="" data-origen="ingreso fallido">solicita una demo</a>.');
+  }).catch(function(e){
+    var m = e && e.message;
+    if(m === 'demo-usada') err('Este acceso de demostración ya se usó en este equipo. Tu usuario personal, con 48 horas de uso libre, te llegará por correo en un máximo de 24 horas. ¿Dudas? <a href="#demo" data-demo="" data-origen="demo ya usada">Escríbenos</a>.');
+    else if(m === 'vencido') err('Tu acceso de prueba ya venció. Para seguir usando el Radar, <a href="#demo" data-demo="" data-origen="prueba vencida">conversemos sobre los planes</a>.');
+    else err('Usuario o contraseña incorrectos. Revisa tus datos o <a href="#demo" data-demo="" data-origen="ingreso fallido">solicita una demo</a>.');
     $('lgPass').select();
   }).then(function(){ b.disabled = false; b.textContent = 'Ingresar al Radar'; });
 });
@@ -1540,11 +1575,15 @@ function buscarBoton(rootNode, textos){
   })(rootNode);
   return hits[0] || null;
 }
-function abrir(modo){
+function abrir(modo, intento){
   if(!el){ cargar(); }
-  var b = el && el.shadowRoot ? buscarBoton(el.shadowRoot, modo === 'texto' ? ['escribir a marcela','escribir'] : ['hablar con marcela']) : null;
+  if(!el) return;
+  el.classList.add('mc-show');
+  var b = el.shadowRoot ? buscarBoton(el.shadowRoot, modo === 'texto' ? ['escribir a marcela','escribir'] : ['hablar con marcela']) : null;
   if(b){ b.click(); return; }
-  if(el){ el.classList.add('mc-pulse'); setTimeout(function(){ el && el.classList.remove('mc-pulse'); }, 4000); }
+  intento = intento || 0;
+  if(intento < 12){ setTimeout(function(){ abrir(modo, intento + 1); }, 250); return; }   // el widget aún carga
+  el.classList.add('mc-pulse'); setTimeout(function(){ el && el.classList.remove('mc-pulse'); }, 4000);
   var h = document.createElement('div'); h.className = 'mc-hint'; h.setAttribute('role','status');
   h.textContent = 'Marcela te espera abajo a la izquierda: toca “' + (modo === 'texto' ? 'Escribir a Marcela' : 'Hablar con Marcela') + '”.';
   document.body.appendChild(h); setTimeout(function(){ h.remove(); }, 5000);
