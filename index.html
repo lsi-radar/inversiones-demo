@@ -513,6 +513,11 @@ elevenlabs-convai.mc-show{animation:heroIn .35s ease both;}
 .mc-aviso-si{background:#14212C;color:#F4EFE3;}
 .mc-aviso-no{background:transparent;color:#14212C;}
 .mc-hint{position:fixed;left:24px;bottom:120px;z-index:2000;max-width:300px;padding:12px 14px;border-radius:12px;background:var(--paper);color:var(--ink);font-size:13.5px;line-height:1.45;box-shadow:0 18px 40px rgba(0,0,0,.45);animation:heroIn .3s ease both;}
+html:not(.locked) .mc-cta.sb-cta{display:grid !important;}
+html.locked .sb-cta,html.sb-off .mc-cta.sb-cta{display:none !important;}
+.mc-cta.sb-cta{margin:4px 0 26px;}
+@media(max-width:1000px){.mc-cta.sb-cta{order:initial;margin:0 0 22px;}}
+.sb-hint{left:auto;right:24px;}
 elevenlabs-convai.mc-pulse{filter:drop-shadow(0 0 14px rgba(216,173,82,.9));}
 html:not(.locked) .mc-cta,.mc-off .mc-cta{display:none !important;}
 @media (prefers-reduced-motion:reduce){.mc-av{animation:none;}}
@@ -622,6 +627,11 @@ html:not(.locked) .mc-cta,.mc-off .mc-cta{display:none !important;}
       <div class="hero-cta">
         <a class="btn btn-gold" href="#radar">Explorar el Radar de inversiones</a>
         <a class="btn btn-line" href="#alertas">Crear una alerta</a>
+      </div>
+      <div class="mc-cta sb-cta" id="sbCta">
+        <div class="mc-av"><img src="marca/sebastian-256.jpg" alt="Sebastián, analista virtual de LSI" width="76" height="76" onerror="this.parentNode.classList.add('noimg');this.remove()"><span class="mc-ini" aria-hidden="true">S</span><i class="mc-on" title="En línea"></i></div>
+        <div class="mc-t"><b>Pregúntale a Sebastián, tu analista del Radar</b><span>Dile qué buscas —un sector, un país, una empresa— y te muestra lo que registra el Radar, con montos y fuentes.</span></div>
+        <div class="mc-b"><button type="button" class="mc-voice" data-sebastian="voz"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="9" y="3" width="6" height="11" rx="3"/><path d="M5 11a7 7 0 0 0 14 0M12 18v3"/></svg>Hablar con Sebastián</button><button type="button" class="mc-text" data-sebastian="texto"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 12a8 8 0 0 1-11.6 7.1L4 20l1-4.4A8 8 0 1 1 21 12z"/></svg>o escríbele</button></div>
       </div>
       <div class="kpis" id="kpis"></div>
     </div>
@@ -1242,6 +1252,50 @@ function renderTrends(){
   $('tMore').innerHTML = list.length > T.show ? '<button class="btn btn-line" type="button">Mostrar más tendencias</button>' : '';
 }
 
+/* ── Puente para Sebastián (agente analista): consulta y navegación ── */
+function aplicarFiltros(f){
+  f = f || {};
+  resetBase();
+  if(f.q) B.q = f.q;
+  if(f.pais) B.pais = f.pais;
+  if(f.tipo) B.tipo = f.tipo;
+  if(f.sector) B.sector = f.sector;
+  if(f.monto){
+    B.monto = f.monto;
+    var sel = $('bMonto'); if(!sel.querySelector('option[value="'+f.monto+'"]')) sel.insertAdjacentHTML('beforeend', '<option value="'+f.monto+'">Desde '+usd(f.monto)+'</option>');
+  }
+  if(f.pub) B.pub = f.pub;
+  if(f.sort) B.sort = f.sort;
+  $('bQ').value = B.q; $('bSector').value = B.sector; $('bMonto').value = String(B.monto || 0); $('bPub').value = B.pub; $('bSort').value = B.sort;
+  renderBase();
+  if($('ov').classList.contains('open')) closeFicha();
+  go('radar');
+  var n = 0, emps = {}; D.anuncios.forEach(function(a){ if(passA(a)){ n++; emps[a.emp] = 1; } });
+  return {anuncios: n, empresas: Object.keys(emps).length};
+}
+function filtrarTendencias(f){
+  f = f || {};
+  T.q = f.q || ''; T.pais = f.pais || 'todos'; T.sem = 'todas'; T.show = 12;
+  $('tQ').value = T.q; $('tSem').value = 'todas';
+  renderTrends();
+  if($('ov').classList.contains('open')) closeFicha();
+  go('tendencias');
+}
+function crearAlerta(x){
+  x.id = 'alert_' + Date.now(); x.label = alertLabel(x); x.created = new Date().toLocaleDateString('es-PE');
+  var a = loadA(); a.push(x); saveA(a); renderAlerts();
+  if($('ov').classList.contains('open')) closeFicha();
+  go('alertas');
+  var n = 0, emps = {}; D.anuncios.forEach(function(an){ if(matchA(an, x)){ n++; emps[an.emp] = 1; } });
+  return {etiqueta: x.label, coincidencias: n, empresas: Object.keys(emps).length};
+}
+window.LSI_API = {
+  D: D, EMP: EMP, GRP: GRP, SEM: SEM, SEM_IDS: SEM_IDS, LAST: LAST, PAIS: PAIS, PORDER: PORDER, SECTORES: SECTORES,
+  TIPOS: TIPOS.map(function(t){ return t[0]; }), total: total, usd: usd, norm: norm,
+  openFicha: openFicha, closeFicha: closeFicha, go: go, aplicarFiltros: aplicarFiltros, filtrarTendencias: filtrarTendencias,
+  crearAlerta: crearAlerta, alertas: function(){ return loadA().map(function(x){ return alertLabel(x); }); }
+};
+
 /* ── Inicio ── */
 renderBase(); renderAlerts(); renderTrends();
 // Enlaces directos: #empresa=<id>  ·  enlaces antiguos a secciones
@@ -1674,6 +1728,371 @@ document.addEventListener('click', function(ev){ var t = ev.target.closest('[dat
 if(!LSI_MARCELA.activa) root.classList.add('mc-off');
 // Se carga cuando se confirma que no hay sesión guardada; se retira al ingresar
 new MutationObserver(function(){ if(root.classList.contains('locked')) cargar(); else retirar(); })
+  .observe(root, {attributes:true, attributeFilter:['class']});
+cargar();
+})();
+</script>
+<script>
+/* ══ Sebastián, agente analista (ElevenLabs) ═════════════════════════
+   Solo existe dentro del Radar (después de ingresar). Responde con lo que devuelven
+   sus herramientas, que consultan los datos ya abiertos en este navegador: a ElevenLabs
+   solo viajan los fragmentos de cada búsqueda, nunca el Radar completo.          */
+window.LSI_SEBASTIAN = { agentId: 'agent_7301m7fyat35efcsa39j30z10s5h', activa: true };
+(function(){
+'use strict';
+var root = document.documentElement, el = null;
+var VOZ_MAX_SEG = 360, topeVoz = null, contextoVoz = null, aviso = null;
+
+/* ── Utilidades ── */
+function A(){ return window.LSI_API; }
+function n(s){ return String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim(); }
+function corto(t, max){ t = String(t || '').replace(/\s+/g, ' ').trim(); return t.length > max ? t.slice(0, max - 1).replace(/\s+\S*$/, '') + '…' : t; }
+function fuenteTxt(f){
+  var t = String(f || '').split(/\s+[—–|]\s+|\s\|\s?/)[0].trim();
+  if(/^https?:/.test(t)) t = t.replace(/^https?:\/\/(www\.)?/, '').split('/')[0];
+  return t || 'no registrada en el Radar';
+}
+function semTxt(id){ var s = A().SEM[id]; return s ? s.label + ' (' + s.rango + ')' : ''; }
+function json(o){ return JSON.stringify(o); }
+var STOP = {de:1,del:1,la:1,las:1,el:1,los:1,en:1,y:1,o:1,un:1,una:1,que:1,por:1,para:1,con:1,sobre:1,al:1,se:1,su:1,sus:1,es:1};
+function tokens(q){ return n(q).split(/[^a-z0-9&]+/).filter(function(t){ return t.length > 2 && !STOP[t]; }); }
+
+var PAISES = {peru:'peru', 'perú':'peru', pe:'peru', colombia:'colombia', co:'colombia', chile:'chile', cl:'chile', ecuador:'ecuador', ec:'ecuador'};
+function pais(v){
+  if(v == null || v === '') return {v:null};
+  var k = n(v); if(!k || /^(todos|todas|todo|region|region andina|andina|cualquiera|all)$/.test(k)) return {v:null};
+  if(PAISES[k]) return {v:PAISES[k]};
+  return {err:'País no reconocido: "' + v + '". El Radar cubre Perú, Colombia, Chile y Ecuador.'};
+}
+var SECT_KW = [
+  [/miner|mina|cobre|oro\b/, 'Minería'], [/energ|hidrocarb|petrol|gas\b|electric|renovab|solar|eolic/, 'Energía e hidrocarburos'],
+  [/banc|finan|fintech|seguro|credito/, 'Banca, finanzas y fintech'], [/retail|moda|tienda|comercio|supermerc/, 'Retail y moda'],
+  [/tecnolog|telecom|software|digital|data center/, 'Tecnología y telecomunicaciones'], [/turism|hotel|gastronom|restaur/, 'Turismo, hotelería y gastronomía'],
+  [/salud|farma|clinica|hospital|medic/, 'Salud y farmacéutica'], [/automotr|maquinaria|vehicul|auto\b/, 'Automotriz y maquinaria'],
+  [/agro|agricol|export/, 'Agroindustria y agroexportación'], [/construc|inmobil|vivienda/, 'Construcción e inmobiliario'],
+  [/manufact|industri|fabric|planta/, 'Manufactura e industria'], [/educa|universi|colegio|instituto/, 'Educación'],
+  [/aliment|consumo masivo|bebida/, 'Alimentos y consumo masivo'], [/infraestr|logist|puerto|aeropuert|carreter|transporte/, 'Infraestructura y logística'],
+  [/servicio|entreten|deport|evento/, 'Servicios y entretenimiento']
+];
+function sector(v){
+  if(v == null || v === '') return {v:null};
+  var k = n(v); if(/^(todos|todas|cualquiera)$/.test(k)) return {v:null};
+  var S = A().SECTORES, i;
+  for(i=0;i<S.length;i++) if(n(S[i]) === k) return {v:S[i]};
+  for(i=0;i<S.length;i++) if(n(S[i]).indexOf(k) >= 0 || k.indexOf(n(S[i])) >= 0) return {v:S[i]};
+  for(i=0;i<SECT_KW.length;i++) if(SECT_KW[i][0].test(k) && S.indexOf(SECT_KW[i][1]) >= 0) return {v:SECT_KW[i][1]};
+  return {err:'Sector no reconocido: "' + v + '". Sectores del Radar: ' + S.join('; ') + '.'};
+}
+function tipo(v){
+  if(v == null || v === '') return {v:null};
+  var k = n(v); if(/^(todos|todas|cualquiera)$/.test(k)) return {v:null};
+  if(/m ?& ?a|fusion|adquisi|compra|venta de|m y a/.test(k)) return {v:'M&A'};
+  if(/financ|deuda|bono|prestamo|credito|ipo|capital/.test(k)) return {v:'Financiamiento'};
+  if(/expansi|apertura|nueva(s)? (tienda|sede|local)/.test(k)) return {v:'Expansión'};
+  if(/estrateg|plan/.test(k)) return {v:'Estrategia'};
+  if(/inversi|invierte|proyecto/.test(k)) return {v:'Inversión'};
+  return {err:'Tipo no reconocido: "' + v + '". Tipos del Radar: Inversión, Expansión, M&A, Financiamiento y Estrategia.'};
+}
+function semanas(v){
+  var k = parseInt(v, 10); if(!k || k < 1) return null;
+  return new Set(A().SEM_IDS.slice(-k));
+}
+function montoMin(v){ var m = parseFloat(v); return m > 0 ? m * 1e6 : 0; }
+function hayTexto(a, toks){
+  if(!toks.length) return true;
+  var X = A(), e = X.EMP[a.emp], g = X.GRP[a.emp];
+  var h = n([e.nombre, e.razon, a.proyecto, a.detalle, a.rubro, a.lugar, g ? g.g.nombre : ''].join(' '));
+  return toks.every(function(t){ return h.indexOf(t) >= 0; });
+}
+function filtros(p){
+  var r = {}, x;
+  x = pais(p.pais); if(x.err) return {err:x.err}; r.pais = x.v;
+  x = sector(p.sector); if(x.err) return {err:x.err}; r.sector = x.v;
+  x = tipo(p.tipo); if(x.err) return {err:x.err}; r.tipo = x.v;
+  r.sem = semanas(p.ultimas_semanas); r.monto = montoMin(p.monto_minimo_millones); r.toks = tokens(p.texto);
+  return r;
+}
+function pasa(a, f){
+  if(f.pais && a.pais !== f.pais) return false;
+  if(f.sector && a.sector !== f.sector) return false;
+  if(f.tipo && a.tipo !== f.tipo) return false;
+  if(f.sem && !f.sem.has(a.sem)) return false;
+  if(f.monto && !(a.montoUsd >= f.monto)) return false;
+  return hayTexto(a, f.toks);
+}
+function anuncioCorto(a, detalle){
+  var X = A(), e = X.EMP[a.emp];
+  var o = {empresa: e.nombre, empresa_id: e.id, pais: X.PAIS[a.pais].n, semana: semTxt(a.sem), tipo: a.tipo, sector: a.sector,
+    proyecto: corto(a.proyecto, 160), monto: a.montoTxt || 'No informado', fuente: fuenteTxt(a.fuente)};
+  if(detalle) o.detalle = corto(a.detalle, detalle);
+  if(a.lugar) o.lugar = corto(a.lugar, 90);
+  if(a.sem === X.LAST) o.nuevo_esta_semana = true;
+  return o;
+}
+function empresa(q){
+  var X = A(), k = n(q); if(!k) return {err:'Falta el nombre de la empresa.'};
+  var list = X.D.empresas, exact = [], pre = [], cont = [], tok = [];
+  var tk = tokens(q);
+  list.forEach(function(e){
+    var nm = n(e.nombre), rz = n(e.razon), id = e.id;
+    if(nm === k || rz === k || id === k) exact.push(e);
+    else if(nm.indexOf(k) === 0 || rz.indexOf(k) === 0) pre.push(e);
+    else if(nm.indexOf(k) >= 0 || rz.indexOf(k) >= 0) cont.push(e);
+    else if(tk.length && tk.every(function(t){ return (nm + ' ' + rz).indexOf(t) >= 0; })) tok.push(e);
+  });
+  var c = exact.length ? exact : pre.length ? pre : cont.length ? cont : tok;
+  if(!c.length){
+    // ¿Es un grupo empresarial?
+    var g = (X.D.grupos || []).filter(function(g){ return n(g.nombre).indexOf(k) >= 0; })[0];
+    if(g) return {grupo: g};
+    return {err:'No hay ninguna empresa llamada "' + q + '" en el Radar.'};
+  }
+  if(c.length > 1 && !exact.length) return {varias: c.slice(0, 8)};
+  return {e: c[0]};
+}
+
+/* ── Herramientas de consulta ── */
+var H = {};
+H.info_radar = function(){
+  var X = A(), D = X.D, last = X.SEM[X.LAST];
+  var porPais = X.PORDER.map(function(p){
+    var an = D.anuncios.filter(function(a){ return a.pais === p; });
+    return {pais: X.PAIS[p].n, anuncios: an.length, empresas: new Set(an.map(function(a){ return a.emp; })).size,
+      monto_confirmado: X.usd(X.total(an)) || 'sin montos informados', tendencias: D.tendencias.filter(function(t){ return t.pais === p; }).length};
+  });
+  return json({
+    actualizado_hasta: last.rango, ultima_semana: last.label,
+    semanas_cubiertas: D.semanas.map(function(s){ return s.label + ' (' + s.rango + ')'; }),
+    totales: {empresas: D.empresas.length, anuncios: D.anuncios.length, monto_confirmado: X.usd(X.total(D.anuncios)),
+      anuncios_nuevos_ultima_semana: D.anuncios.filter(function(a){ return a.sem === X.LAST; }).length, tendencias: D.tendencias.length},
+    por_pais: porPais, sectores: X.SECTORES, tipos_de_anuncio: X.TIPOS,
+    alertas_del_usuario: X.alertas(),
+    nota: 'Los montos son los confirmados en los anuncios; muchos anuncios no informan monto. La cobertura más profunda es la de Perú.'
+  });
+};
+H.buscar_anuncios = function(p){
+  p = p || {}; var X = A(), f = filtros(p); if(f.err) return json({error: f.err});
+  var res = X.D.anuncios.filter(function(a){ return pasa(a, f); });
+  if(p.orden === 'monto') res.sort(function(a,b){ return (b.montoUsd||0) - (a.montoUsd||0) || b.sem - a.sem; });
+  else res.sort(function(a,b){ return b.sem - a.sem || (b.montoUsd||0) - (a.montoUsd||0); });
+  var lim = Math.min(Math.max(parseInt(p.limite, 10) || 8, 1), 15);
+  if(!res.length) return json({encontrados: 0, mensaje: 'No hay anuncios en el Radar con esos criterios.'});
+  return json({
+    encontrados: res.length, empresas: new Set(res.map(function(a){ return a.emp; })).size,
+    monto_confirmado_total: X.usd(X.total(res)) || 'ninguno de estos anuncios informa monto',
+    mostrando: Math.min(lim, res.length), orden: p.orden === 'monto' ? 'mayor monto primero' : 'más recientes primero',
+    anuncios: res.slice(0, lim).map(function(a){ return anuncioCorto(a, 220); })
+  });
+};
+H.ver_empresa = function(p){
+  p = p || {}; var X = A(), r = empresa(p.empresa);
+  if(r.err) return json({error: r.err});
+  if(r.varias) return json({varias_coincidencias: r.varias.map(function(e){ return {empresa: e.nombre, empresa_id: e.id, sector: e.sector, pais: X.PAIS[e.items[0].pais].n}; }),
+    mensaje: 'Pregunta al usuario a cuál se refiere.'});
+  if(r.grupo) return json({grupo: r.grupo.nombre, empresas_del_grupo: r.grupo.miembros.filter(function(m){ return X.EMP[m.emp]; }).map(function(m){ var e = X.EMP[m.emp];
+    return {empresa: e.nombre, empresa_id: e.id, rol: m.rol, anuncios: e.items.length, monto_confirmado: X.usd(X.total(e.items)) || 'no informado'}; })});
+  var e = r.e, g = X.GRP[e.id];
+  var o = {empresa: e.nombre, empresa_id: e.id, razon_social: e.razon, sector: e.sector,
+    paises: Array.from(new Set(e.items.map(function(a){ return X.PAIS[a.pais].n; }))),
+    anuncios_registrados: e.items.length, monto_confirmado_total: X.usd(X.total(e.items)) || 'no informado',
+    primer_registro: semTxt(e.first), ultimo_registro: semTxt(e.last),
+    anuncios: e.items.slice(0, 12).map(function(a){ return anuncioCorto(a, 260); })};
+  if(g) o.grupo_empresarial = g.g.nombre + ' (' + g.rol + ')';
+  if(e.perfil) o.perfil = corto(e.perfil, 420);
+  if(e.items.length > 12) o.nota = 'Se muestran los 12 anuncios más recientes de ' + e.items.length + '.';
+  return json(o);
+};
+H.resumen_radar = function(p){
+  p = p || {}; var X = A(), f = filtros(p); if(f.err) return json({error: f.err});
+  var res = X.D.anuncios.filter(function(a){ return pasa(a, f); });
+  if(!res.length) return json({anuncios: 0, mensaje: 'No hay anuncios en el Radar con esos criterios.'});
+  var dim = p.agrupar_por || (f.sector ? (f.pais ? 'tipo' : 'pais') : 'sector');
+  var key = {sector:'sector', pais:'pais', tipo:'tipo'}[dim] || 'sector';
+  var grupos = {};
+  res.forEach(function(a){ (grupos[a[key]] = grupos[a[key]] || []).push(a); });
+  var desglose = Object.keys(grupos).map(function(k){ var it = grupos[k];
+    return {nombre: key === 'pais' ? X.PAIS[k].n : k, anuncios: it.length, empresas: new Set(it.map(function(a){ return a.emp; })).size, monto_confirmado: X.usd(X.total(it)) || 'no informado', _m: X.total(it)}; })
+    .sort(function(a,b){ return b._m - a._m || b.anuncios - a.anuncios; }).map(function(x){ delete x._m; return x; });
+  var porEmp = {}; res.forEach(function(a){ (porEmp[a.emp] = porEmp[a.emp] || []).push(a); });
+  var emps = Object.keys(porEmp).map(function(id){ return {e: X.EMP[id], it: porEmp[id], m: X.total(porEmp[id])}; });
+  var topMonto = emps.filter(function(x){ return x.m > 0; }).sort(function(a,b){ return b.m - a.m; }).slice(0, 6)
+    .map(function(x){ return {empresa: x.e.nombre, empresa_id: x.e.id, monto_confirmado: X.usd(x.m), anuncios: x.it.length}; });
+  var topN = emps.slice().sort(function(a,b){ return b.it.length - a.it.length || b.m - a.m; }).slice(0, 5)
+    .map(function(x){ return {empresa: x.e.nombre, empresa_id: x.e.id, anuncios: x.it.length}; });
+  return json({anuncios: res.length, empresas: emps.length, monto_confirmado_total: X.usd(X.total(res)) || 'no informado',
+    anuncios_con_monto: res.filter(function(a){ return a.montoUsd; }).length,
+    desglose_por: key, desglose: desglose, empresas_con_mayor_monto: topMonto, empresas_con_mas_anuncios: topN});
+};
+H.buscar_tendencias = function(p){
+  p = p || {}; var X = A(), x = pais(p.pais); if(x.err) return json({error: x.err});
+  var toks = tokens(p.texto), sem = semanas(p.ultimas_semanas);
+  var res = X.D.tendencias.filter(function(t){
+    if(x.v && t.pais !== x.v) return false;
+    if(sem && !sem.has(t.sem)) return false;
+    var h = n(t.titulo + ' ' + t.evidencia + ' ' + t.lectura);
+    return toks.every(function(k){ return h.indexOf(k) >= 0; });
+  }).sort(function(a,b){ return b.sem - a.sem; });
+  var lim = Math.min(Math.max(parseInt(p.limite, 10) || 5, 1), 10);
+  if(!res.length) return json({encontradas: 0, mensaje: 'No hay tendencias en el Radar con esos criterios.'});
+  return json({encontradas: res.length, mostrando: Math.min(lim, res.length), tendencias: res.slice(0, lim).map(function(t){
+    return {titulo: t.titulo, pais: X.PAIS[t.pais].n, semana: semTxt(t.sem), evidencia: corto(t.evidencia, 320), lectura: corto(t.lectura, 280), fuente: fuenteTxt(t.fuente)}; })});
+};
+
+/* ── Herramientas de navegación ── */
+H.abrir_ficha = function(p){
+  p = p || {}; var X = A(), r = empresa(p.empresa);
+  if(r.err) return json({error: r.err});
+  if(r.varias) return json({varias_coincidencias: r.varias.map(function(e){ return e.nombre; }), mensaje: 'Pregunta al usuario cuál quiere abrir.'});
+  if(r.grupo) return json({error: '"' + p.empresa + '" es un grupo empresarial; abre la ficha de una de sus empresas.'});
+  X.openFicha(r.e.id);
+  return json({ok: true, abierta: r.e.nombre});
+};
+H.filtrar_radar = function(p){
+  p = p || {}; var X = A(), f = filtros(p); if(f.err) return json({error: f.err});
+  var k = parseInt(p.ultimas_semanas, 10), pub = !k ? 'todas' : k === 1 ? 'nuevos' : k === 2 ? '2' : k <= 4 ? '4' : 'todas';
+  var r = X.aplicarFiltros({q: String(p.texto || '').trim(), pais: f.pais, sector: f.sector, tipo: f.tipo, monto: f.monto, pub: pub, sort: p.orden === 'monto' ? 'monto' : 'reciente'});
+  return json({ok: true, en_pantalla: r.empresas + ' empresas y ' + r.anuncios + ' anuncios en la sección Radar de inversiones'});
+};
+H.mostrar_tendencias = function(p){
+  p = p || {}; var X = A(), x = pais(p.pais); if(x.err) return json({error: x.err});
+  X.filtrarTendencias({q: String(p.texto || '').trim(), pais: x.v || 'todos'});
+  return json({ok: true});
+};
+H.ir_a_seccion = function(p){
+  var m = {inicio:'inicio', portada:'inicio', paises:'paises', alertas:'alertas', 'mis alertas':'alertas', radar:'radar', 'radar de inversiones':'radar', tendencias:'tendencias', planes:'planes'};
+  var s = m[n(p && p.seccion)]; if(!s) return json({error: 'Sección no reconocida. Opciones: inicio, paises, alertas, radar, tendencias, planes.'});
+  var X = A(); if(document.getElementById('ov').classList.contains('open')) X.closeFicha();
+  X.go(s); return json({ok: true});
+};
+H.crear_alerta = function(p){
+  p = p || {}; var X = A(), f = filtros(p); if(f.err) return json({error: f.err});
+  var kw = String(p.palabra_clave || '').trim();
+  if(!f.pais && !f.sector && !f.tipo && !f.monto && !kw) return json({error: 'La alerta necesita al menos un criterio: país, sector, tipo, monto mínimo o palabra clave.'});
+  var r = X.crearAlerta({pais: f.pais || 'todos', sector: f.sector || 'todos', tipo: f.tipo || 'todos', monto_min: f.monto || null, keyword: kw});
+  return json({ok: true, alerta: r.etiqueta, coincidencias_hoy: r.coincidencias + ' anuncios de ' + r.empresas + ' empresas',
+    nota: 'La alerta se guarda en este navegador y se actualiza con cada carga semanal del Radar.'});
+};
+H.conversar_sobre_planes = function(p){
+  p = p || {}; var X = A();
+  if(document.getElementById('ov').classList.contains('open')) X.closeFicha();
+  if(!window.openDemo) return json({error: 'El formulario no está disponible.'});
+  window.openDemo(null, 'Sebastián (planes)', 'Cuéntanos cómo usaría el Radar tu equipo y te presentamos el plan que mejor encaja. <b>Sebastián</b> ya anotó tu interés en el mensaje.');
+  var msg = document.getElementById('dmMsg'); if(msg && p.interes) msg.value = 'Conversé con Sebastián en el Radar. Me interesa: ' + String(p.interes).trim();
+  return json({ok: true, mensaje: 'Se abrió el formulario para conversar sobre planes; el usuario debe completar sus datos y enviarlo.'});
+};
+window.LSI_SEB_TOOLS = H;        // también sirve para probar las herramientas desde la consola
+
+/* ── Contexto de la sesión para el agente ── */
+function sesion(){
+  var sv = {}; try{ sv = JSON.parse(sessionStorage.getItem('lsi_sesion_v1') || localStorage.getItem('lsi_sesion_v1') || '{}') || {}; }catch(e){}
+  var nombre = sv.n && !/demostraci/i.test(sv.n) ? sv.n : '';
+  var acceso = sv.t === 'demo' ? 'visita de demostración de 60 minutos' : sv.v ? 'acceso de prueba personal de 48 horas' : 'suscriptor';
+  return {nombre: nombre || 'sin nombre', acceso: acceso};
+}
+
+/* ── Widget ── */
+function avisar(texto, ms){
+  var h = document.createElement('div'); h.className = 'mc-hint sb-hint'; h.setAttribute('role','status');
+  h.textContent = texto; document.body.appendChild(h); setTimeout(function(){ h.remove(); }, ms || 5000);
+}
+function buscarEn(rootNode, selector){
+  var out = [];
+  (function walk(nd){
+    if(!nd || !nd.querySelectorAll) return;
+    var m = nd.querySelectorAll(selector); for(var i=0;i<m.length;i++) out.push(m[i]);
+    var all = nd.querySelectorAll('*'); for(var k=0;k<all.length;k++){ if(all[k].shadowRoot) walk(all[k].shadowRoot); }
+  })(rootNode);
+  return out;
+}
+function buscarBoton(textos){
+  if(!el || !el.shadowRoot) return null;
+  var b = buscarEn(el.shadowRoot, 'button,[role=button]');
+  for(var i=0;i<b.length;i++){ var t = ((b[i].getAttribute('aria-label')||'') + ' ' + (b[i].textContent||'')).toLowerCase();
+    for(var j=0;j<textos.length;j++) if(t.indexOf(textos[j]) >= 0) return b[i]; }
+  return null;
+}
+function leerTranscripcion(){
+  if(!el || !el.shadowRoot) return '';
+  var l = buscarEn(el.shadowRoot, '[class*="pl-16"][class*="justify-end"],[class*="pr-16"][class*="origin-top-left"]').map(function(m){
+    var t = (m.textContent || '').replace(/\s+/g, ' ').trim();
+    return t ? (/pl-16/.test(m.className) ? 'Usuario: ' : 'Sebastián: ') + t : '';
+  }).filter(Boolean).join('\n');
+  return l.length > 4000 ? '…' + l.slice(-4000) : l;
+}
+function ocultarAviso(){ if(aviso){ try{ aviso.hidePopover && aviso.hidePopover(); }catch(e){} aviso.remove(); aviso = null; } }
+function seguirPorEscrito(){
+  ocultarAviso();
+  var campo = el && el.shadowRoot ? buscarEn(el.shadowRoot, 'textarea,input[type=text]')[0] : null;
+  if(campo){ campo.focus(); return; }
+  abrir('texto');
+}
+function mostrarAvisoVoz(){
+  ocultarAviso();
+  aviso = document.createElement('div'); aviso.className = 'mc-aviso'; aviso.setAttribute('role','alertdialog');
+  aviso.setAttribute('aria-label','La llamada con Sebastián terminó');
+  aviso.innerHTML = '<img src="marca/sebastian-256.jpg" alt="" width="44" height="44" onerror="this.remove()">' +
+    '<div><strong>La llamada de voz llegó a su límite de 6 minutos.</strong>' +
+    '<p>Sebastián puede seguir ayudándote por escrito, justo donde se quedaron.</p>' +
+    '<div class="mc-aviso-b"><button type="button" class="mc-aviso-si">Seguir por escrito</button>' +
+    '<button type="button" class="mc-aviso-no">Ahora no</button></div></div>';
+  aviso.querySelector('.mc-aviso-si').onclick = seguirPorEscrito;
+  aviso.querySelector('.mc-aviso-no').onclick = ocultarAviso;
+  if(aviso.showPopover){ aviso.setAttribute('popover','manual'); document.body.appendChild(aviso); try{ aviso.showPopover(); }catch(e){} }
+  else document.body.appendChild(aviso);
+}
+function cerrarVoz(){
+  var b = buscarBoton(['terminar']); if(!b) return;
+  contextoVoz = leerTranscripcion() || 'no disponible';
+  b.click(); mostrarAvisoVoz();
+}
+function cargar(){
+  if(!LSI_SEBASTIAN.activa || el || !window.LSI_API || root.classList.contains('locked')) return;
+  if(!/^agent_/.test(LSI_SEBASTIAN.agentId)) return;
+  el = document.createElement('elevenlabs-convai');
+  el.className = 'mc-show sb-widget';
+  el.setAttribute('agent-id', LSI_SEBASTIAN.agentId);
+  el.addEventListener('elevenlabs-convai:call', function(ev){
+    var cfg = ev.detail.config, s = sesion(), X = A();
+    clearTimeout(topeVoz);
+    if(!cfg.textOnly){ topeVoz = setTimeout(cerrarVoz, VOZ_MAX_SEG * 1000); }
+    ocultarAviso();
+    cfg.dynamicVariables = Object.assign({}, cfg.dynamicVariables, {
+      nombre_usuario: s.nombre, tipo_acceso: s.acceso,
+      actualizado_hasta: X ? X.SEM[X.LAST].rango : 'sin dato',
+      conversacion_previa: contextoVoz !== null ? contextoVoz : 'ninguna'
+    });
+    if(contextoVoz !== null){
+      cfg.overrides = cfg.overrides || {}; cfg.overrides.agent = cfg.overrides.agent || {};
+      cfg.overrides.agent.firstMessage = cfg.textOnly
+        ? 'Aquí seguimos, ahora por escrito. Retomemos donde nos quedamos.'
+        : 'Aquí estoy de nuevo. Retomemos donde nos quedamos.';
+      contextoVoz = null;
+    }
+    var tools = {};
+    Object.keys(H).forEach(function(k){ tools[k] = function(p){ try{ return H[k](p || {}); }catch(e){ return json({error: 'No se pudo completar la consulta.'}); } }; });
+    cfg.clientTools = tools;
+  });
+  document.body.appendChild(el);
+  if(!document.getElementById('el-convai-js')){
+    var sc = document.createElement('script'); sc.id = 'el-convai-js'; sc.async = true; sc.type = 'text/javascript';
+    sc.src = 'https://unpkg.com/@elevenlabs/convai-widget-embed';
+    document.body.appendChild(sc);
+  }
+}
+function abrir(modo, intento){
+  if(!el) cargar();
+  if(!el){ avisar('Sebastián todavía no está disponible. Inténtalo en unos minutos.'); return; }
+  var b = buscarBoton(modo === 'texto' ? ['escribir a sebasti', 'escribir'] : ['hablar con sebasti']);
+  if(b){ b.click(); return; }
+  intento = intento || 0;
+  if(intento < 12){ setTimeout(function(){ abrir(modo, intento + 1); }, 250); return; }
+  el.classList.add('mc-pulse'); setTimeout(function(){ el && el.classList.remove('mc-pulse'); }, 4000);
+  avisar('Sebastián te espera abajo a la derecha: toca “' + (modo === 'texto' ? 'Escribir a Sebastián' : 'Hablar con Sebastián') + '”.');
+}
+document.addEventListener('click', function(ev){ var t = ev.target.closest('[data-sebastian]'); if(t){ ev.preventDefault(); abrir(t.dataset.sebastian); } });
+if(!LSI_SEBASTIAN.activa || !/^agent_/.test(LSI_SEBASTIAN.agentId)) root.classList.add('sb-off');
+// Se carga cuando el Radar ya está abierto (después de ingresar)
+new MutationObserver(function(){ if(!root.classList.contains('locked')) setTimeout(cargar, 0); })
   .observe(root, {attributes:true, attributeFilter:['class']});
 cargar();
 })();
