@@ -1592,6 +1592,49 @@ $('tbOut').addEventListener('click', function(){
 })();
 </script>
 <script>
+/* ══ Ajustes comunes de los widgets de Marcela y Sebastián ══════════════
+   · Panel más pequeño en computadora (opcional).
+   · Se minimiza solo cuando la conversación terminó y el usuario ya calificó
+     (o tras un minuto sin actividad, si no califica).                          */
+window.LSI_widgetExtras = function(el, o){
+  o = o || {};
+  var CSS = '@media (min-width:641px){[data-variant=compact].sheet{max-width:' + (o.ancho || 340) + 'px !important;max-height:min(' + (o.alto || 440) + 'px, calc(100vh - 150px)) !important;}}';
+  var conv = 0, hecho = -1, baseG = 0, baseF = 0, tG = 0, tF = 0;
+  var RE_G = /Gracias por tu opini/g, RE_F = /¿(Qué te pareció|Te sirvió) la conversación\?/g, RE_DET = /Tu opinión nos ayuda/;
+  function raices(){ var out = []; (function walk(n){ if(!n) return; out.push(n); var all = n.querySelectorAll('*'); for(var i=0;i<all.length;i++) if(all[i].shadowRoot) walk(all[i].shadowRoot); })(el.shadowRoot); return out; }
+  function texto(){ return raices().map(function(r){ var t = ''; r.childNodes.forEach(function(c){ if(c.nodeName !== 'STYLE') t += ' ' + (c.textContent || ''); }); return t; }).join(' '); }
+  function cuenta(tx, re){ var m = tx.match(re); return m ? m.length : 0; }
+  function boton(txts){
+    var rs = raices();
+    for(var k=0;k<rs.length;k++){ var b = rs[k].querySelectorAll('button,[role=button]');
+      for(var i=0;i<b.length;i++){ var t = ((b[i].getAttribute('aria-label')||'') + ' ' + (b[i].textContent||'')).toLowerCase();
+        for(var j=0;j<txts.length;j++) if(t.indexOf(txts[j]) >= 0) return b[i]; } }
+    return null;
+  }
+  function estilo(){ if(!o.compacto) return; raices().forEach(function(r){ if(!r.__lsiCss){ var st = document.createElement('style'); st.textContent = CSS; r.appendChild(st); r.__lsiCss = 1; } }); }
+  el.addEventListener('elevenlabs-convai:call', function(){ conv++; var tx = texto(); baseG = cuenta(tx, RE_G); baseF = cuenta(tx, RE_F); tG = tF = 0; });
+  var iv = setInterval(function(){
+    if(!el.isConnected){ clearInterval(iv); return; }
+    if(!el.shadowRoot) return;
+    estilo();
+    var min = boton(['minimizar']); if(!min || hecho === conv || conv === 0) return;
+    if(o.pausa && o.pausa()) return;
+    var activo = raices().some(function(r){ var a = r.activeElement; return a && /TEXTAREA|INPUT/.test(a.tagName) && (a.value || '').trim(); });
+    var tx = texto(), now = Date.now();
+    if(RE_DET.test(tx) || activo){ tG = tF = 0; return; }           // está escribiendo su comentario o un mensaje
+    var gracias = cuenta(tx, RE_G) > baseG, fin = cuenta(tx, RE_F) > baseF;
+    if(gracias){
+      if(!tG) tG = now;
+      var espera = boton(['cuéntanos más','cuentanos mas']) ? 10000 : 2000;   // da tiempo a "Cuéntanos más"
+      if(now - tG >= espera){ hecho = conv; min.click(); }
+    } else if(fin){
+      if(!tF) tF = now;
+      if(now - tF >= 60000){ hecho = conv; min.click(); }
+    }
+  }, 1000);
+};
+</script>
+<script>
 /* ══ Marcela, agente de voz (ElevenLabs) ═════════════════════════════
    Solo aparece en la pantalla de ingreso. Al ingresar al Radar se retira.
    El agente solo acepta conversaciones desde lsi-radar.github.io.            */
@@ -1635,6 +1678,7 @@ function cargar(){
     };
   });
   document.body.appendChild(el);
+  window.LSI_widgetExtras(el, {pausa: function(){ return !!aviso; }});
   if(!document.getElementById('el-convai-js')){
     var sc = document.createElement('script'); sc.id = 'el-convai-js'; sc.async = true; sc.type = 'text/javascript';
     sc.src = 'https://unpkg.com/@elevenlabs/convai-widget-embed';
@@ -1742,6 +1786,9 @@ window.LSI_SEBASTIAN = { agentId: 'agent_7301m7fyat35efcsa39j30z10s5h', activa: 
 'use strict';
 var root = document.documentElement, el = null;
 var VOZ_MAX_SEG = 360, topeVoz = null, contextoVoz = null, aviso = null;
+// Ayudas por conversación: las herramientas usadas en una misma respuesta cuentan como una sola ayuda
+var AYUDAS_MAX = 2, ayudas = 0, ultimaHerr = 0, GAP_MS = 12000;
+var NOTA_CIERRE = 'Esta es tu segunda demostración en esta conversación. Responde sobre este resultado y, en esa misma respuesta, ofrece al usuario seguir explorando el Radar por su cuenta y recuérdale que puede llamarte o escribirte cuando lo necesite desde tu botón, abajo a la derecha. Si acepta, despídete en una oración y usa end_call; si prefiere seguir contigo, continúa con normalidad.';
 
 /* ── Utilidades ── */
 function A(){ return window.LSI_API; }
@@ -2088,6 +2135,7 @@ function cargar(){
       actualizado_hasta: X ? finRango(X.SEM[X.LAST].rango) : 'la última actualización',
       conversacion_previa: contextoVoz !== null ? contextoVoz : 'ninguna'
     });
+    var continua = contextoVoz !== null;
     if(contextoVoz !== null){
       cfg.overrides = cfg.overrides || {}; cfg.overrides.agent = cfg.overrides.agent || {};
       cfg.overrides.agent.firstMessage = cfg.textOnly
@@ -2095,11 +2143,19 @@ function cargar(){
         : 'Aquí estoy de nuevo. Retomemos donde nos quedamos.';
       contextoVoz = null;
     }
+    if(!continua){ ayudas = 0; ultimaHerr = 0; }
     var tools = {};
-    Object.keys(H).forEach(function(k){ tools[k] = function(p){ try{ return H[k](p || {}); }catch(e){ return json({error: 'No se pudo completar la consulta.'}); } }; });
+    Object.keys(H).forEach(function(k){ tools[k] = function(p){
+      var r, now = Date.now(), cuenta = k !== 'info_radar' && k !== 'conversar_sobre_planes';
+      if(cuenta){ if(now - ultimaHerr > GAP_MS) ayudas++; ultimaHerr = now; }
+      try{ r = H[k](p || {}); }catch(e){ return json({error: 'No se pudo completar la consulta.'}); }
+      if(cuenta && ayudas === AYUDAS_MAX){ try{ var o = JSON.parse(r); o.instruccion_de_cierre = NOTA_CIERRE; r = json(o); }catch(e){} }
+      return r;
+    }; });
     cfg.clientTools = tools;
   });
   document.body.appendChild(el);
+  window.LSI_widgetExtras(el, {compacto: true, ancho: 340, alto: 440, pausa: function(){ return !!aviso; }});
   if(!document.getElementById('el-convai-js')){
     var sc = document.createElement('script'); sc.id = 'el-convai-js'; sc.async = true; sc.type = 'text/javascript';
     sc.src = 'https://unpkg.com/@elevenlabs/convai-widget-embed';
