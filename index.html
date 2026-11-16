@@ -1752,7 +1752,34 @@ function fuenteTxt(f){
   if(/^https?:/.test(t)) t = t.replace(/^https?:\/\/(www\.)?/, '').split('/')[0];
   return t || 'no registrada en el Radar';
 }
-function semTxt(id){ var s = A().SEM[id]; return s ? s.label + ' (' + s.rango + ')' : ''; }
+var MESES = {ene:'enero', feb:'febrero', mar:'marzo', abr:'abril', may:'mayo', jun:'junio', jul:'julio', ago:'agosto', sep:'septiembre', set:'septiembre', oct:'octubre', nov:'noviembre', dic:'diciembre'};
+// "07 – 11 sep 2026" → "entre el 7 y el 11 de septiembre de 2026"; "30 jul – 07 ago 2026" → "entre el 30 de julio y el 7 de agosto de 2026"
+function rango(r){
+  var m = String(r || '').match(/^(\d{1,2})(?:\s+([a-z]{3}))?\s*[–-]\s*(\d{1,2})\s+([a-z]{3})\s+(\d{4})$/i);
+  if(!m) return String(r || '');
+  var d1 = +m[1], d2 = +m[3], m2 = MESES[m[4].toLowerCase()] || m[4], y = m[5];
+  return m[2] ? 'entre el ' + d1 + ' de ' + (MESES[m[2].toLowerCase()] || m[2]) + ' y el ' + d2 + ' de ' + m2 + ' de ' + y
+              : 'entre el ' + d1 + ' y el ' + d2 + ' de ' + m2 + ' de ' + y;
+}
+function finRango(r){
+  var m = String(r || '').match(/(\d{1,2})\s+([a-z]{3})\s+(\d{4})$/i);
+  return m ? (+m[1]) + ' de ' + (MESES[m[2].toLowerCase()] || m[2]) + ' de ' + m[3] : String(r || '');
+}
+function inicioRango(r){
+  var m = String(r || '').match(/^(\d{1,2})(?:\s+([a-z]{3}))?/i), f = String(r || '').match(/([a-z]{3})\s+(\d{4})$/i);
+  if(!m || !f) return String(r || '');
+  return (+m[1]) + ' de ' + (MESES[(m[2] || f[1]).toLowerCase()] || m[2] || f[1]) + ' de ' + f[2];
+}
+function semFecha(id){ var s = A().SEM[id]; return s ? rango(s.rango) : ''; }
+// Fecha de publicación: la de la fuente si la tiene ("Gestión, 9 de septiembre de 2026"); si no, el rango de la carga
+function publicado(fuente, sem){
+  var m = String(fuente || '').match(/(\d{1,2})\s+de\s+([a-záéíóúñ]+)\s+(?:de|del)\s+(\d{4})/i);
+  return m ? (+m[1]) + ' de ' + m[2].toLowerCase() + ' de ' + m[3] : semFecha(sem);
+}
+function medio(fuente){
+  var t = fuenteTxt(fuente);
+  return t.replace(/,?\s*\d{1,2}\s+de\s+[a-záéíóúñ]+\s+(?:de|del)\s+\d{4}\s*$/i, '').trim() || t;
+}
 function json(o){ return JSON.stringify(o); }
 var STOP = {de:1,del:1,la:1,las:1,el:1,los:1,en:1,y:1,o:1,un:1,una:1,que:1,por:1,para:1,con:1,sobre:1,al:1,se:1,su:1,sus:1,es:1};
 function tokens(q){ return n(q).split(/[^a-z0-9&]+/).filter(function(t){ return t.length > 2 && !STOP[t]; }); }
@@ -1822,11 +1849,11 @@ function pasa(a, f){
 }
 function anuncioCorto(a, detalle){
   var X = A(), e = X.EMP[a.emp];
-  var o = {empresa: e.nombre, empresa_id: e.id, pais: X.PAIS[a.pais].n, semana: semTxt(a.sem), tipo: a.tipo, sector: a.sector,
-    proyecto: corto(a.proyecto, 160), monto: a.montoTxt || 'No informado', fuente: fuenteTxt(a.fuente)};
+  var o = {empresa: e.nombre, empresa_id: e.id, pais: X.PAIS[a.pais].n, publicado: publicado(a.fuente, a.sem), tipo: a.tipo, sector: a.sector,
+    proyecto: corto(a.proyecto, 160), monto: a.montoTxt || 'No informado', fuente: medio(a.fuente)};
   if(detalle) o.detalle = corto(a.detalle, detalle);
   if(a.lugar) o.lugar = corto(a.lugar, 90);
-  if(a.sem === X.LAST) o.nuevo_esta_semana = true;
+  if(a.sem === X.LAST) o.nuevo_en_la_ultima_actualizacion = true;
   return o;
 }
 function empresa(q){
@@ -1861,10 +1888,10 @@ H.info_radar = function(){
       monto_confirmado: X.usd(X.total(an)) || 'sin montos informados', tendencias: D.tendencias.filter(function(t){ return t.pais === p; }).length};
   });
   return json({
-    actualizado_hasta: last.rango, ultima_semana: last.label,
-    semanas_cubiertas: D.semanas.map(function(s){ return s.label + ' (' + s.rango + ')'; }),
+    actualizado_hasta: finRango(last.rango), ultima_actualizacion: 'anuncios publicados ' + rango(last.rango),
+    periodo_cubierto: 'del ' + inicioRango(D.semanas[0].rango) + ' al ' + finRango(last.rango) + ', en ' + D.semanas.length + ' cargas semanales',
     totales: {empresas: D.empresas.length, anuncios: D.anuncios.length, monto_confirmado: X.usd(X.total(D.anuncios)),
-      anuncios_nuevos_ultima_semana: D.anuncios.filter(function(a){ return a.sem === X.LAST; }).length, tendencias: D.tendencias.length},
+      anuncios_nuevos_ultima_actualizacion: D.anuncios.filter(function(a){ return a.sem === X.LAST; }).length, tendencias: D.tendencias.length},
     por_pais: porPais, sectores: X.SECTORES, tipos_de_anuncio: X.TIPOS,
     alertas_del_usuario: X.alertas(),
     nota: 'Los montos son los confirmados en los anuncios; muchos anuncios no informan monto. La cobertura más profunda es la de Perú.'
@@ -1895,7 +1922,7 @@ H.ver_empresa = function(p){
   var o = {empresa: e.nombre, empresa_id: e.id, razon_social: e.razon, sector: e.sector,
     paises: Array.from(new Set(e.items.map(function(a){ return X.PAIS[a.pais].n; }))),
     anuncios_registrados: e.items.length, monto_confirmado_total: X.usd(X.total(e.items)) || 'no informado',
-    primer_registro: semTxt(e.first), ultimo_registro: semTxt(e.last),
+    primer_registro: semFecha(e.first), ultimo_registro: semFecha(e.last),
     anuncios: e.items.slice(0, 12).map(function(a){ return anuncioCorto(a, 260); })};
   if(g) o.grupo_empresarial = g.g.nombre + ' (' + g.rol + ')';
   if(e.perfil) o.perfil = corto(e.perfil, 420);
@@ -1935,7 +1962,7 @@ H.buscar_tendencias = function(p){
   var lim = Math.min(Math.max(parseInt(p.limite, 10) || 5, 1), 10);
   if(!res.length) return json({encontradas: 0, mensaje: 'No hay tendencias en el Radar con esos criterios.'});
   return json({encontradas: res.length, mostrando: Math.min(lim, res.length), tendencias: res.slice(0, lim).map(function(t){
-    return {titulo: t.titulo, pais: X.PAIS[t.pais].n, semana: semTxt(t.sem), evidencia: corto(t.evidencia, 320), lectura: corto(t.lectura, 280), fuente: fuenteTxt(t.fuente)}; })});
+    return {titulo: t.titulo, pais: X.PAIS[t.pais].n, publicado: publicado(t.fuente, t.sem), evidencia: corto(t.evidencia, 320), lectura: corto(t.lectura, 280), fuente: medio(t.fuente)}; })});
 };
 
 /* ── Herramientas de navegación ── */
@@ -2058,7 +2085,7 @@ function cargar(){
     ocultarAviso();
     cfg.dynamicVariables = Object.assign({}, cfg.dynamicVariables, {
       nombre_usuario: s.nombre, tipo_acceso: s.acceso,
-      actualizado_hasta: X ? X.SEM[X.LAST].rango : 'sin dato',
+      actualizado_hasta: X ? finRango(X.SEM[X.LAST].rango) : 'la última actualización',
       conversacion_previa: contextoVoz !== null ? contextoVoz : 'ninguna'
     });
     if(contextoVoz !== null){
