@@ -968,7 +968,7 @@ function passA(a, skip){
   if(skip!=='sector' && B.sector!=='todos' && a.sector!==B.sector) return false;
   if(B.monto && !(a.montoUsd >= B.monto)) return false;
   var ps = pubSet(B.pub); if(ps && !ps.has(a.sem)) return false;
-  if(B.q){ var e = EMP[a.emp]; var h = norm(e.nombre+' '+e.razon+' '+a.proyecto+' '+a.detalle+' '+a.rubro+' '+a.lugar+' '+(GRP[a.emp]?GRP[a.emp].g.nombre:'')); if(h.indexOf(norm(B.q)) < 0) return false; }
+  if(B.q){ var e = EMP[a.emp]; var h = norm(e.nombre+' '+e.razon+' '+a.proyecto+' '+a.detalle+' '+a.rubro+' '+a.lugar+' '+(GRP[a.emp]?GRP[a.emp].g.nombre:'')); if(!norm(B.q).split(/\s+/).filter(Boolean).every(function(t){ return h.indexOf(t) >= 0; })) return false; }
   return true;
 }
 (function initBaseControls(){
@@ -1905,6 +1905,8 @@ function anuncioCorto(a, detalle){
 }
 function empresa(q){
   var X = A(), k = n(q); if(!k) return {err:'Falta el nombre de la empresa.'};
+  var gx = (X.D.grupos || []).filter(function(g){ var gn = n(g.nombre); return gn === k || gn === 'grupo ' + k || gn.replace(/^grupo\s+/, '') === k.replace(/^grupo\s+/, ''); })[0];
+  if(gx) return {grupo: gx};
   var list = X.D.empresas, exact = [], pre = [], cont = [], tok = [];
   var tk = tokens(q);
   list.forEach(function(e){
@@ -1923,6 +1925,24 @@ function empresa(q){
   }
   if(c.length > 1 && !exact.length) return {varias: c.slice(0, 8)};
   return {e: c[0]};
+}
+
+/* ── Mostrar en pantalla lo que se consulta (la navegación no depende de que el agente lo pida) ── */
+function pubDe(p){ var k = parseInt(p.ultimas_semanas, 10); return !k ? 'todas' : k === 1 ? 'nuevos' : k === 2 ? '2' : k <= 4 ? '4' : 'todas'; }
+function enPantalla(p, f, res){
+  var X = A(), emps = Array.from(new Set(res.map(function(a){ return a.emp; })));
+  try{
+    if(emps.length === 1){ X.openFicha(emps[0]); return 'Se abrió en la pantalla del usuario la ficha de ' + X.EMP[emps[0]].nombre + '.'; }
+    var q = String(p.texto || '').trim(), base = {pais: f.pais, sector: f.sector, tipo: f.tipo, monto: f.monto, pub: pubDe(p), sort: p.orden === 'monto' ? 'monto' : 'reciente'};
+    var r = X.aplicarFiltros(Object.assign({q: q}, base));
+    if(q && r.anuncios < res.length && f.toks.length > 1){
+      // El buscador de la sección busca la frase exacta; si muestra menos de lo encontrado, prueba con la palabra más específica
+      var larga = f.toks.slice().sort(function(a,b){ return b.length - a.length; })[0];
+      var r2 = X.aplicarFiltros(Object.assign({q: larga}, base));
+      if(Math.abs(r2.anuncios - res.length) > Math.abs(r.anuncios - res.length)) r = X.aplicarFiltros(Object.assign({q: q}, base)); else r = r2;
+    }
+    return 'La sección Radar de inversiones quedó filtrada en la pantalla del usuario: ' + r.empresas + ' empresas y ' + r.anuncios + ' anuncios.';
+  }catch(e){ return ''; }
 }
 
 /* ── Herramientas de consulta ── */
@@ -1955,6 +1975,7 @@ H.buscar_anuncios = function(p){
     encontrados: res.length, empresas: new Set(res.map(function(a){ return a.emp; })).size,
     monto_confirmado_total: X.usd(X.total(res)) || 'ninguno de estos anuncios informa monto',
     mostrando: Math.min(lim, res.length), orden: p.orden === 'monto' ? 'mayor monto primero' : 'más recientes primero',
+    en_pantalla: enPantalla(p, f, res),
     anuncios: res.slice(0, lim).map(function(a){ return anuncioCorto(a, 220); })
   });
 };
@@ -1963,7 +1984,8 @@ H.ver_empresa = function(p){
   if(r.err) return json({error: r.err});
   if(r.varias) return json({varias_coincidencias: r.varias.map(function(e){ return {empresa: e.nombre, empresa_id: e.id, sector: e.sector, pais: X.PAIS[e.items[0].pais].n}; }),
     mensaje: 'Pregunta al usuario a cuál se refiere.'});
-  if(r.grupo) return json({grupo: r.grupo.nombre, empresas_del_grupo: r.grupo.miembros.filter(function(m){ return X.EMP[m.emp]; }).map(function(m){ var e = X.EMP[m.emp];
+  if(r.grupo){ try{ X.aplicarFiltros({q: r.grupo.nombre}); }catch(x){} }
+  if(r.grupo) return json({grupo: r.grupo.nombre, en_pantalla: 'La sección Radar de inversiones quedó filtrada por el grupo.', empresas_del_grupo: r.grupo.miembros.filter(function(m){ return X.EMP[m.emp]; }).map(function(m){ var e = X.EMP[m.emp];
     return {empresa: e.nombre, empresa_id: e.id, rol: m.rol, anuncios: e.items.length, monto_confirmado: X.usd(X.total(e.items)) || 'no informado'}; })});
   var e = r.e, g = X.GRP[e.id];
   var o = {empresa: e.nombre, empresa_id: e.id, razon_social: e.razon, sector: e.sector,
@@ -1974,6 +1996,7 @@ H.ver_empresa = function(p){
   if(g) o.grupo_empresarial = g.g.nombre + ' (' + g.rol + ')';
   if(e.perfil) o.perfil = corto(e.perfil, 420);
   if(e.items.length > 12) o.nota = 'Se muestran los 12 anuncios más recientes de ' + e.items.length + '.';
+  try{ X.openFicha(e.id); o.en_pantalla = 'Se abrió en la pantalla del usuario la ficha de ' + e.nombre + '.'; }catch(x){}
   return json(o);
 };
 H.resumen_radar = function(p){
@@ -1993,7 +2016,8 @@ H.resumen_radar = function(p){
     .map(function(x){ return {empresa: x.e.nombre, empresa_id: x.e.id, monto_confirmado: X.usd(x.m), anuncios: x.it.length}; });
   var topN = emps.slice().sort(function(a,b){ return b.it.length - a.it.length || b.m - a.m; }).slice(0, 5)
     .map(function(x){ return {empresa: x.e.nombre, empresa_id: x.e.id, anuncios: x.it.length}; });
-  return json({anuncios: res.length, empresas: emps.length, monto_confirmado_total: X.usd(X.total(res)) || 'no informado',
+  var pant = (f.pais || f.sector || f.tipo || f.monto || f.toks.length || f.sem) ? enPantalla(p, f, res) : (X.go('paises'), 'Se muestra en pantalla la sección Países.');
+  return json({anuncios: res.length, empresas: emps.length, monto_confirmado_total: X.usd(X.total(res)) || 'no informado', en_pantalla: pant,
     anuncios_con_monto: res.filter(function(a){ return a.montoUsd; }).length,
     desglose_por: key, desglose: desglose, empresas_con_mayor_monto: topMonto, empresas_con_mas_anuncios: topN});
 };
@@ -2008,7 +2032,8 @@ H.buscar_tendencias = function(p){
   }).sort(function(a,b){ return b.sem - a.sem; });
   var lim = Math.min(Math.max(parseInt(p.limite, 10) || 5, 1), 10);
   if(!res.length) return json({encontradas: 0, mensaje: 'No hay tendencias en el Radar con esos criterios.'});
-  return json({encontradas: res.length, mostrando: Math.min(lim, res.length), tendencias: res.slice(0, lim).map(function(t){
+  var pant = ''; try{ X.filtrarTendencias({q: toks.length === 1 ? String(p.texto).trim() : '', pais: x.v || 'todos'}); pant = 'La sección Tendencias quedó filtrada en la pantalla del usuario.'; }catch(e){}
+  return json({encontradas: res.length, mostrando: Math.min(lim, res.length), en_pantalla: pant, tendencias: res.slice(0, lim).map(function(t){
     return {titulo: t.titulo, pais: X.PAIS[t.pais].n, publicado: publicado(t.fuente, t.sem), evidencia: corto(t.evidencia, 320), lectura: corto(t.lectura, 280), fuente: medio(t.fuente)}; })});
 };
 
